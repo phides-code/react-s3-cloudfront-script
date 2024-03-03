@@ -9,19 +9,21 @@ This Bash script sets up a React application hosted on AWS with S3 and CloudFron
 
 ## Prerequisites:
 
-### An AWS account and AWS CLI set up with credentials:
+### \* Linux or a POSIX-compliant shell (for example MacOS or WSL on Windows)
+
+### \* An AWS account and AWS CLI set up with credentials:
 
 -   AWS CLI : https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
 
 -   AWS credentials configured in the home directory under .aws/
 
-### git and gh (GitHub CLI) set up with your credentials:
+### \* git and gh (GitHub CLI) set up with your credentials:
 
 -   git : https://git-scm.com/
 
 -   gh : https://cli.github.com/
 
-### npm and jq
+### \* npm and jq
 
 -   npm : https://www.npmjs.com/
 
