@@ -28,7 +28,7 @@ mv src/main.tsx src/index.tsx
 sed -i "s/vite-template-redux/$project_name/g" package.json
 rm .prettierrc.json
 # this version of counterSlice.test.ts avoids build errors with the version from vite-template-redux
-cp "$HOME"/myscripts/build-s3-frontend/counterSlice.test.ts src/features/counter/
+cp ../counterSlice.test.ts src/features/counter/counterSlice.test.ts
 
 ### setup aws secrets
 # Path to AWS credentials and config files
@@ -64,47 +64,47 @@ if [ -z "$AWS_REGION" ]; then
   exit 1
 fi
 
-### Generate UUID 
-uuid=$(uuidgen)
-short_uuid=${uuid:0:8}
+### Generate random ID for CloudFront CallerReference and S3 bucket name
+random_id=$(head /dev/urandom | md5sum | head -c 32)
+short_id=${random_id:0:8}
 
 ### setup new s3 bucket 
-# Combine project name and short UUID
-bucket_name="${project_name}-${short_uuid}"
+# Combine project name and short ID
+bucket_name="${project_name}-${short_id}"
 
 # Create the S3 bucket
 aws s3 mb "s3://${bucket_name}"
 echo "Created S3 bucket: ${bucket_name}"
 
-### setup cloudfront
-# copy cloudfront distribution config, s3 policy, and oac config
-cp "$HOME"/myscripts/build-s3-frontend/my-dist-config.json .
-cp "$HOME"/myscripts/build-s3-frontend/s3-policy.json .
-cp "$HOME"/myscripts/build-s3-frontend/oac-config.json .
+### setup CloudFront
+# copy CloudFront distribution config, S3 policy, and OAC config
+cp ../my-dist-config.json .
+cp ../s3-policy.json .
+cp ../oac-config.json .
 
 # replace placeholder names in json files 
 sed -i "s|BUCKET_NAME|$bucket_name|" my-dist-config.json
-sed -i "s|CALLER_REFERENCE|$uuid|" my-dist-config.json
+sed -i "s|CALLER_REFERENCE|$random_id|" my-dist-config.json
 sed -i "s|AWS_REGION|$AWS_REGION|" my-dist-config.json
 sed -i "s|BUCKET_NAME|$bucket_name|" s3-policy.json
 sed -i "s|BUCKET_NAME|$bucket_name|" oac-config.json
 
-# create oac, capture the oac id and insert in my-dist-config.json
+# create OAC, capture the OAC id and insert in my-dist-config.json
 oac_create_response=$(aws cloudfront create-origin-access-control --origin-access-control-config file://oac-config.json)
 oac_id=$(echo "$oac_create_response" | jq -r '.OriginAccessControl.Id')
 sed -i "s|OAC_ID|$oac_id|" my-dist-config.json
 
-# create cloudfront distribution and capture the ARN 
+# create CloudFront distribution and capture the ARN 
 dist_create_response=$(aws cloudfront create-distribution --distribution-config file://my-dist-config.json)
 arn=$(echo "$dist_create_response" | jq -r '.Distribution.ARN')
 dist_domain=$(echo "$dist_create_response" | jq -r '.Distribution.DomainName')
 distribution_id=$(echo "$dist_create_response" | jq -r '.Distribution.Id')
-echo "Created distribution ${distribution_id}"
+echo "Created distribution: ${distribution_id}"
 
 # update s3-policy.json with ARN
 sed -i "s|SOURCE_ARN|$arn|" s3-policy.json
 
-# update s3 bucket policy
+# update S3 bucket policy
 aws s3api put-bucket-policy --bucket "$bucket_name" --policy file://s3-policy.json
 
 # remove json files
@@ -115,13 +115,36 @@ rm oac-config.json
 ### setup github workflow:
 mkdir .github
 mkdir .github/workflows
-cp "$HOME"/myscripts/build-s3-frontend/main.yml .github/workflows/main.yml
+cp ../main.yml .github/workflows/main.yml
 
-### setup git repo:
+### setup local git repo:
 git init
-gh repo create
 
-### Set GitHub secrets using 
+### setup remote git repo
+# display a mini menu to prompt for GitHub repo visibility
+visibility_options=("public" "private")
+echo ""
+PS3="Please select repo visibility: Make this GitHub repo Public (1) or Private (2)? "
+select option in "${visibility_options[@]}"; do
+    case $option in
+        "public")
+            selected_visibility="public"
+            break
+            ;;
+        "private")
+            selected_visibility="private"
+            break
+            ;;
+        *)
+            echo "Invalid option. Please select 1 (public) or 2 (private)."
+            ;;
+    esac
+done
+
+# create remote repo on github
+gh repo create  --source=. --"$selected_visibility"
+
+### Set GitHub secrets  
 gh secret set AWS_DISTRIBUTION --body "$distribution_id"
 gh secret set AWS_S3_BUCKET --body "$bucket_name"
 gh secret set AWS_ACCESS_KEY_ID --body "$AWS_ACCESS_KEY_ID"
@@ -134,6 +157,12 @@ git add .
 git commit -m "initial commit"
 git push origin main
 
+### wrap up message
 echo ""
 echo "Created distribution at domain: https://${dist_domain}"
-
+echo ""
+echo "Please allow a few moments for the GitHub Actions workflow to complete."
+echo "View the progress by running:"
+echo "cd $project_name"
+echo "gh run watch"
+echo ""
