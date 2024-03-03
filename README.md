@@ -1,4 +1,4 @@
-# react-s3-cloudfront-template
+# react-s3-cloudfront-script
 
 This Bash script sets up a React application hosted on AWS with S3 and CloudFront, using GitHub Actions.
 
