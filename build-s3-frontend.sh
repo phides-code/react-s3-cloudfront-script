@@ -27,8 +27,7 @@ sed -i "s|main|index|" index.html
 mv src/main.tsx src/index.tsx
 sed -i "s/vite-template-redux/$project_name/g" package.json
 rm .prettierrc.json
-# this version of counterSlice.test.ts avoids build errors with the version from vite-template-redux
-cp ../counterSlice.test.ts src/features/counter/counterSlice.test.ts
+jq '. + {exclude: ["vite.config.ts"]}' tsconfig.json | sponge tsconfig.json
 
 ### setup aws secrets
 # Path to AWS credentials and config files
